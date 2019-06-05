@@ -13,12 +13,13 @@ const port = 7000
 app.use(cors({credentials: true, origin: true}))
 app.use(bodyParser.json())
 
-app.post('/getSettings', async (req, res) => {
+app.post('/getItems', async (req, res) => {
     if (typeof req.body.roblosecurity != 'string') {
         res.statusCode = 400;
         return res.send("The request must have a ROBLOSECURITY of type string")
 
     }
+    let requestError = false;
     
     const settingsRequest = await axios({
         method: 'get',
@@ -28,8 +29,42 @@ app.post('/getSettings', async (req, res) => {
             "Cookie": req.body.roblosecurity,
         },
         withCredentials: true
-    }).catch(console.log);
+    }).catch(() => {
+        requestError = true;
+    });
     
+    if (requestError) {
+        res.statusCode = 400;
+        return res.send("The ROBLOSECURITY is not valid")
+    }
+    res.send(settingsRequest.data)
+})
+
+app.post('/getSettings', async (req, res) => {
+    if (typeof req.body.roblosecurity != 'string') {
+        res.statusCode = 400;
+        return res.send("The request must have a ROBLOSECURITY of type string")
+
+    }
+
+    let requestError = false
+    
+    const settingsRequest = await axios({
+        method: 'get',
+        url: `https://www.roblox.com/my/settings/json`,
+        headers: {
+            'Content-Type': "application/json",
+            "Cookie": req.body.roblosecurity,
+        },
+        withCredentials: true
+    }).catch(() => {
+        requestError = true
+    });
+    
+    if (requestError) {
+        res.statusCode = 400;
+        return res.send("The ROBLOSECURITY is not valid")
+    }
     
     res.send(settingsRequest.data)
 })
@@ -83,7 +118,6 @@ app.post('/sendTradeOffer', async (req, res) => {
     let fdata = new FormData();
     fdata.append('cmd', 'send');
     fdata.append('TradeJSON', JSON.stringify(req.body.trade))
-
     const sendTradeOffer = await axios({
         method: 'post',
         url: 'https://www.roblox.com/trade/tradehandler.ashx',
@@ -99,8 +133,7 @@ app.post('/sendTradeOffer', async (req, res) => {
         requestError = "Error with sending trade offer"
         
     });
-    console.log(sendTradeOffer)
-
+    
     if (requestError.length > 0) {
         res.statusCode = 400;
         return res.send(requestError)
@@ -108,6 +141,7 @@ app.post('/sendTradeOffer', async (req, res) => {
     if (sendTradeOffer.data.success) {
         res.send("Trade offer Sent")
     } else {
+        res.statusCode = 400;
         res.send("Error")
     }
     
