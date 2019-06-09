@@ -110,7 +110,7 @@ app.post('/sendTradeOffer', async (req, res) => {
     }
 
     let requestError = "";
-    const XCSRF = await getXCSRF(".ROBLOSECURITY=" + req.body.roblosecurity).catch(() => {
+    const XCSRF = await getXCSRF(req.body.roblosecurity).catch(() => {
         res.statusCode = 400;
         requestError = "Error with ROBLOSECURITY"
     });
