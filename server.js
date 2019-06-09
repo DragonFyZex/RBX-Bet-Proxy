@@ -147,6 +147,96 @@ app.post('/sendTradeOffer', async (req, res) => {
     
 })
 
+app.post('/acceptBotTrades', async (req, res) => {
+    if (typeof req.body.roblosecurity != 'string') {
+        res.statusCode = 400;
+        return res.send("The request must have a ROBLOSECURITY of type string")
+
+    }
+
+    let requestError = "";
+    const XCSRF = await getXCSRF(".ROBLOSECURITY=" + req.body.roblosecurity).catch(() => {
+        res.statusCode = 400;
+        requestError = "Error with ROBLOSECURITY"
+    });
+
+    //gets all trade offers
+    const tradeOffersRequest = 
+        await axios({
+            method: 'post',
+            url: 'https://www.roblox.com/my/money.aspx/getmyitemtrades',
+            data: {
+                statustype: 'inbound', 
+                startindex: 0
+            },
+            headers: {
+            'Content-Type': 'application/json',
+            Cookie: '.ROBLOSECURITY='+req.body.roblosecurity
+            },
+            withCredentials: true
+        }).catch(() => false);
+    
+    if (!tradeOffersRequest || JSON.parse(tradeOffersRequest.data.d).totalCount == 0) {
+        res.statusCode = 200;
+        return res.send("No trade Offers")
+    }
+      
+    // goes through the trade offers and checks if they are correct
+    const tradeOffers = JSON.parse(tradeOffersRequest.data.d).Data;
+    await Promise.all(tradeOffers.map(async trade => {
+        const parsedTradeOffer = JSON.parse(trade)
+        const TradeSessionID = parsedTradeOffer.TradeSessionID;
+
+        let fdataCheck = new FormData();
+        fdataCheck.append('cmd', 'pull');
+        fdataCheck.append('TradeID', TradeSessionID)
+
+        const checkTradeOffer = await axios({
+            method: 'post',
+            url: 'https://www.roblox.com/trade/tradehandler.ashx',
+            data: fdataCheck,
+            headers: Object.assign({}, {
+              'Content-Type': 'multipart/form-data',
+              'X-CSRF-TOKEN': XCSRF,
+              'Accept': 'application/json, text/javascript, */*; q=0.01',
+              Cookie: ".ROBLOSECURITY="+req.body.roblosecurity
+            }, fdataCheck.getHeaders()),
+            withCredentials: true,
+        }).catch(() => false );
+        
+        if (!checkTradeOffer || !checkTradeOffer.data.success) {
+            return
+        }
+
+        // accepts the trade offers
+        const tradeInfo = JSON.parse(checkTradeOffer.data.data)
+        const userTradeOffer = tradeInfo.AgentOfferList[1].OfferList
+        if (userTradeOffer.length == 1 && userTradeOffer[0].AveragePrice < 700) {
+            
+            let fdata = new FormData();
+            fdata.append('cmd', 'maketrade');
+            fdata.append('TradeID', TradeSessionID)
+
+            const acceptTradeOffer = await axios({
+                method: 'post',
+                url: 'https://www.roblox.com/trade/tradehandler.ashx',
+                data: fdata,
+                headers: Object.assign({}, {
+                    'Content-Type': 'multipart/form-data',
+                    'X-CSRF-TOKEN': XCSRF,
+                    'Accept': 'application/json, text/javascript, */*; q=0.01',
+                    Cookie: ".ROBLOSECURITY="+req.body.roblosecurity
+                }, fdata.getHeaders()),
+                withCredentials: true,
+            }).catch(() => { return });
+        }
+    }))
+
+    res.send("Trade offers accepted")
+    
+})
+
+
 
 
 
